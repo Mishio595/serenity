@@ -510,13 +510,22 @@ fn handle_event<H: EventHandler + Send + Sync + 'static>(
             });
         },
         DispatchEvent::Model(Event::MessageUpdate(mut event)) => {
+            let message = match CACHE.read().messages.get(&event.channel_id) {
+                Some(map) => {
+                    match map.get(&event.id) {
+                        Some(m) => Some(m.clone()),
+                        None => None,
+                    }
+                },
+                None => None,
+            };
             update!(event);
 
             let context = context(data, runner_tx, shard_id);
             let event_handler = Arc::clone(event_handler);
 
             threadpool.execute(move || {
-                event_handler.message_update(context, event);
+                event_handler.message_update(context, event, message);
             });
         },
         DispatchEvent::Model(Event::PresencesReplace(mut event)) => {
