@@ -510,6 +510,15 @@ fn handle_event<H: EventHandler + Send + Sync + 'static>(
             });
         },
         DispatchEvent::Model(Event::MessageUpdate(mut event)) => {
+            let message = match CACHE.read().messages.get(&event.channel_id) {
+                Some(map) => {
+                    match map.get(&event.id) {
+                        Some(m) => Some(m.clone()),
+                        None => None,
+                    }
+                },
+                None => None,
+            };
             update!(event);
 
             let context = context(data, runner_tx, shard_id);
