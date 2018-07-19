@@ -1120,6 +1120,13 @@ impl Framework for StandardFramework {
                     } else if let Some(CommandOrAlias::Command(ref command)) =
                         group.default_command {
                         let command = Arc::clone(command);
+                        
+                        args = {
+                            let content = message.content.chars().skip(position).skip_while(|x| x.is_whitespace())
+                                .skip(command_length-to_check.len()).collect::<String>();
+
+                            Args::new(&content.trim(), &self.configuration.delimiters)
+                        };
 
                         if let Some(error) = self.should_fail(
                             &mut context,
