@@ -1117,6 +1117,46 @@ impl Framework for StandardFramework {
                         });
 
                         return;
+                    } else if let Some(CommandOrAlias::Command(ref command)) =
+                        group.default_command {
+                        let command = Arc::clone(command);
+
+                        if let Some(error) = self.should_fail(
+                            &mut context,
+                            &message,
+                            &command.options(),
+                            &group,
+                            &mut args,
+                            &to_check,
+                            &built,
+                        ) {
+                            if let Some(ref handler) = self.dispatch_error_handler {
+                                handler(context, message, error);
+                            }
+                            return;
+                        }
+
+                        threadpool.execute(move || {
+                            if let Some(before) = before {
+                                if !(before)(&mut context, &message, &built) {
+                                    return;
+                                }
+                            }
+
+                            if !command.before(&mut context, &message) {
+                                return;
+                            }
+
+                            let result = command.execute(&mut context, &message, args);
+
+                            command.after(&mut context, &message, &result);
+
+                            if let Some(after) = after {
+                                (after)(&mut context, &message, &built, result);
+                            }
+                        });
+
+                        return;
                     }
                 }
             }

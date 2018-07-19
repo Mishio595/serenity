@@ -92,6 +92,7 @@ impl<D: fmt::Display> From<D> for Error {
 pub struct CommandGroup {
     pub prefixes: Option<Vec<String>>,
     pub commands: HashMap<String, CommandOrAlias>,
+    pub default_command: Option<CommandOrAlias>,
     /// Some fields taken from Command
     pub bucket: Option<String>,
     pub required_permissions: Permissions,
@@ -111,6 +112,7 @@ impl Default for CommandGroup {
         CommandGroup {
             prefixes: None,
             commands: HashMap::new(),
+            default_command: None,
             bucket: None,
             required_permissions: Permissions::empty(),
             dm_only: false,

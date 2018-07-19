@@ -83,6 +83,17 @@ impl CreateGroup {
         self
     }
 
+    /// Sets the default command for the group.
+    /// This is run when the group prefix is matched, but no sub-commands are found.
+    pub fn default_command<F>(mut self, f: F) -> Self
+        where F: FnOnce(CreateCommand) -> CreateCommand {
+        let cmd = f(self.build_command()).finish();
+
+        self.0.default_command = Some(CommandOrAlias::Command(cmd));
+
+        self
+    }
+
     /// Adds a command to group with a simplified API.
     /// You can return Err(From::from(string)) if there's an error.
     pub fn on(self, name: &str,
