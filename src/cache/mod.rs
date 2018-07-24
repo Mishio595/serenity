@@ -617,7 +617,7 @@ impl Cache {
             messages.get(&message_id).cloned()
         })
     }
-
+    
     /// Retrieves a [`PrivateChannel`] from the cache's [`private_channels`]
     /// map, if it exists.
     ///
