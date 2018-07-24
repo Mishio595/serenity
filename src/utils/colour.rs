@@ -201,11 +201,9 @@ impl Colour {
     /// ```rust
     /// use serenity::utils::Colour;
     ///
-    /// assert_eq!(Colour::new(6573123).hex(), "644C43");
+    /// assert_eq!(Colour::new(6573123).hex(), String::from("644C43"));
     /// ```
-    pub fn hex(&self) -> String {
-        format!("{:06X}", self.0)
-    }
+    pub fn hex(&self) -> String { format!("{:06X}", self.0) }
 }
 
 impl From<i32> for Colour {
