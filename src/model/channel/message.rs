@@ -616,6 +616,12 @@ impl AsRef<MessageId> for Message {
     }
 }
 
+impl AsRef<MessageId> for Message {
+    fn as_ref(&self) -> &MessageId {
+        &self.id
+    }
+}
+
 impl From<Message> for MessageId {
     /// Gets the Id of a `Message`.
     fn from(message: Message) -> MessageId { message.id }
