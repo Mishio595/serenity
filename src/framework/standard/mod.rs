@@ -1112,6 +1112,13 @@ impl Framework for StandardFramework {
                             let command = Arc::clone(command);
                             let mut args = command_and_help_args!(&message.content, position, command_length, &self.configuration.delimiters);
 
+                            let mut args = {
+                                let content = message.content.chars().skip(position).skip_while(|x| x.is_whitespace())
+                                    .skip(command_length).collect::<String>();
+
+                                Args::new(&content.trim(), &self.configuration.delimiters)
+                            };
+
                             if let Some(error) = self.should_fail(
                                 &mut context,
                                 &message,
