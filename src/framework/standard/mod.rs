@@ -1053,7 +1053,7 @@ impl Framework for StandardFramework {
                         // we want to make sure that all following matching prefixes are longer
                         // than the last matching one, this prevents picking a wrong prefix,
                         // e.g. "f" instead of "ferris" due to "f" having a lower index in the `Vec`.
-                        longest_matching_prefix_len = prefixes.iter().fold(0, |longest_prefix_len, prefix|
+                        let longest_matching_prefix_len = prefixes.iter().fold(0, |longest_prefix_len, prefix|
                             if prefix.len() > longest_prefix_len
                             && built.starts_with(prefix)
                             && (orginal_round.len() == prefix.len() || built.get(prefix.len()..prefix.len() + 1) == Some(" ")) {
