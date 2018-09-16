@@ -1053,7 +1053,7 @@ impl Framework for StandardFramework {
                         // we want to make sure that all following matching prefixes are longer
                         // than the last matching one, this prevents picking a wrong prefix,
                         // e.g. "f" instead of "ferris" due to "f" having a lower index in the `Vec`.
-                        let longest_matching_prefix_len = prefixes.iter().fold(0, |longest_prefix_len, prefix|
+                        longest_matching_prefix_len = prefixes.iter().fold(0, |longest_prefix_len, prefix|
                             if prefix.len() > longest_prefix_len
                             && built.starts_with(prefix)
                             && (orginal_round.len() == prefix.len() || built.get(prefix.len()..prefix.len() + 1) == Some(" ")) {
@@ -1111,13 +1111,6 @@ impl Framework for StandardFramework {
                             group.commands.get(&to_check) {
                             let command = Arc::clone(command);
                             let mut args = command_and_help_args!(&message.content, position, command_length, &self.configuration.delimiters);
-
-                            let mut args = {
-                                let content = message.content.chars().skip(position).skip_while(|x| x.is_whitespace())
-                                    .skip(command_length).collect::<String>();
-
-                                Args::new(&content.trim(), &self.configuration.delimiters)
-                            };
 
                             if let Some(error) = self.should_fail(
                                 &mut context,
