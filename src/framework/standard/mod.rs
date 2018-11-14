@@ -39,7 +39,7 @@ use model::{
     id::{ChannelId, GuildId, UserId},
     Permissions
 };
-use self::command::{AfterHook, BeforeHook, UnrecognisedCommandHook};
+use self::command::{AfterHook, BeforeHook, MessageWithoutCommandHook, UnrecognisedCommandHook};
 use std::{
     collections::HashMap,
     default::Default,
@@ -217,6 +217,7 @@ pub struct StandardFramework {
     buckets: HashMap<String, Bucket>,
     after: Option<Arc<AfterHook>>,
     unrecognised_command: Option<Arc<UnrecognisedCommandHook>>,
+    message_without_command: Option<Arc<MessageWithoutCommandHook>>,
     /// Whether the framework has been "initialized".
     ///
     /// The framework is initialized once one of the following occurs:
@@ -532,7 +533,7 @@ impl StandardFramework {
                 }
             }
 
-            if self.configuration.owners.contains(&message.author.id) {
+            if command.owner_privileges && self.configuration.owners.contains(&message.author.id) {
                 return None;
             }
 
@@ -949,9 +950,34 @@ impl StandardFramework {
         self
     }
 
+    /// Specify the function to be called if a message contains no command.
+    ///
+    /// # Examples
+    ///
+    /// Using `message_without_command`:
+    ///
+    /// ```rust,no_run
+    /// # use serenity::prelude::*;
+    /// # struct Handler;
+    /// #
+    /// # impl EventHandler for Handler {}
+    /// # let mut client = Client::new("token", Handler).unwrap();
+    /// #
+    /// use serenity::framework::StandardFramework;
+    ///
+    /// client.with_framework(StandardFramework::new()
+    ///     .message_without_command(|ctx, msg| { }));
+    /// ```
+    pub fn message_without_command<F>(mut self, f: F) -> Self
+        where F: Fn(&mut Context, &Message) + Send + Sync + 'static {
+        self.message_without_command = Some(Arc::new(f));
+
+        self
+    }
+
     /// Sets what code should be executed when a user sends `(prefix)help`.
     ///
-    /// If a command named `help` was set with [`command`], then this takes precendence first.
+    /// If a command named `help` was set with [`command`], then this takes precedence first.
     ///
     /// [`command`]: #method.command
     pub fn help(mut self, f: HelpFunction) -> Self {
@@ -1004,12 +1030,54 @@ impl Framework for StandardFramework {
                 // Ensure that there is _at least one_ position remaining. There
                 // is no point in continuing if there is not.
                 if positions.is_empty() {
+
+                    if let Some(ref prefix_only_cmd) =
+                        self.configuration.prefix_only_cmd {
+                        let prefix_only_cmd = Arc::clone(prefix_only_cmd);
+                        let before = self.before.clone();
+                        let after = self.after.clone();
+
+                        threadpool.execute(move || {
+                            if let Some(before) = before {
+                                if !(before)(&mut context, &message, "") {
+                                    return;
+                                }
+                            }
+
+                            if !prefix_only_cmd.before(&mut context, &message) {
+                                return;
+                            }
+
+                            let result = prefix_only_cmd.execute(&mut context,
+                                &message, Args::new("", &Vec::new()));
+
+                            prefix_only_cmd.after(&mut context, &message,
+                                &result);
+
+                            if let Some(after) = after {
+                                (after)(&mut context, &message, "", result);
+                            }
+                        });
+                    }
+
                     return;
                 }
 
                 positions
             },
-            None => return,
+            None => {
+                if let &Some(ref message_without_command) = &self.message_without_command {
+
+                    if !(self.configuration.ignore_bots && message.author.bot) {
+                        let message_without_command = message_without_command.clone();
+                        threadpool.execute(move || {
+                            (message_without_command)(&mut context, &message);
+                        });
+                    }
+                }
+
+                return;
+            },
         };
 
         'outer: for position in positions {
@@ -1160,6 +1228,21 @@ impl Framework for StandardFramework {
                                 Args::new(&orginal_round[longest_matching_prefix_len..], &self.configuration.delimiters)
                             };
 
+                            if let Some(error) = self.should_fail(
+                                &mut context,
+                                &message,
+                                &command.options(),
+                                &group,
+                                &mut args,
+                                &to_check,
+                                &built,
+                            ) {
+                                if let Some(ref handler) = self.dispatch_error_handler {
+                                    handler(context, message, error);
+                                }
+                                return;
+                            }
+
                             threadpool.execute(move || {
                                 if let Some(before) = before {
                                     if !(before)(&mut context, &message, &args.full()) {
@@ -1190,9 +1273,33 @@ impl Framework for StandardFramework {
         if !(self.configuration.ignore_bots && message.author.bot) {
 
             if let &Some(ref unrecognised_command) = &self.unrecognised_command {
-                let unrecognised_command = unrecognised_command.clone();
-                threadpool.execute(move || {
-                    (unrecognised_command)(&mut context, &message, &unrecognised_command_name);
+
+                // If both functions are set, we need to clone `Context` and
+                // `Message`, else we can avoid it.
+                if let &Some(ref message_without_command) = &self.message_without_command {
+                    let mut context_unrecognised = context.clone();
+                    let message_unrecognised = message.clone();
+
+                    let unrecognised_command = unrecognised_command.clone();
+                    threadpool.execute(move || {
+                        (unrecognised_command)(&mut context_unrecognised, &message_unrecognised,
+                        &unrecognised_command_name);
+                    });
+
+                    let message_without_command = message_without_command.clone();
+                        threadpool.execute(move || {
+                            (message_without_command)(&mut context, &message);
+                    });
+                } else {
+                    let unrecognised_command = unrecognised_command.clone();
+                    threadpool.execute(move || {
+                        (unrecognised_command)(&mut context, &message, &unrecognised_command_name);
+                    });
+                }
+            } else if let &Some(ref message_without_command) = &self.message_without_command {
+                let message_without_command = message_without_command.clone();
+                    threadpool.execute(move || {
+                        (message_without_command)(&mut context, &message);
                 });
             }
         }
@@ -1205,8 +1312,9 @@ impl Framework for StandardFramework {
 
 #[cfg(feature = "cache")]
 pub fn has_correct_permissions(command: &Arc<CommandOptions>, message: &Message) -> bool {
-    if !command.required_permissions.is_empty() {
-
+    if command.required_permissions.is_empty() {
+        true
+    } else {
         if let Some(guild) = message.guild() {
             let perms = guild
                 .with(|g| g.permissions_in(message.channel_id, message.author.id));
@@ -1215,8 +1323,6 @@ pub fn has_correct_permissions(command: &Arc<CommandOptions>, message: &Message)
         } else {
             false
         }
-    } else {
-        true
     }
 }
 
@@ -1238,7 +1344,7 @@ pub fn has_correct_roles(cmd: &Arc<CommandOptions>, guild: &Guild, member: &Memb
 /// The command can't be used in the current channel (as in `DM only` or `guild only`).
 #[derive(PartialEq, Debug)]
 pub enum HelpBehaviour {
-    /// Strikes a command by applying `~~{comand_name}~~`.
+    /// Strikes a command by applying `~~{command_name}~~`.
     Strike,
     /// Does not list a command in the help-menu.
     Hide,

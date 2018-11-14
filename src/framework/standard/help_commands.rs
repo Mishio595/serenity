@@ -112,8 +112,8 @@ impl Suggestions {
         &self.0
     }
 
-    /// Concats names of suggestions with a given `seperator`.
-    fn join(&self, seperator: &str) -> String {
+    /// Concats names of suggestions with a given `separator`.
+    fn join(&self, separator: &str) -> String {
         let mut iter = self.as_vec().iter();
 
         let first_iter_element = match iter.next() {
@@ -122,12 +122,12 @@ impl Suggestions {
         };
 
         let size = self.as_vec().iter().fold(0, |total_size, size| total_size + size.name.len());
-        let byte_len_of_sep = self.as_vec().len().checked_sub(1).unwrap_or(0) * seperator.len();
+        let byte_len_of_sep = self.as_vec().len().checked_sub(1).unwrap_or(0) * separator.len();
         let mut result = String::with_capacity(size + byte_len_of_sep);
         result.push_str(first_iter_element.name.borrow());
 
         for element in iter {
-            result.push_str(&*seperator);
+            result.push_str(&*separator);
             result.push_str(element.name.borrow());
         }
 
@@ -303,6 +303,7 @@ pub fn is_command_visible(command_options: &Arc<CommandOptions>, msg: &Message, 
 
 /// Tries to extract a single command matching searched command name otherwise
 /// returns similar commands.
+#[cfg(feature = "cache")]
 fn fetch_single_command<'a, H: BuildHasher>(
     groups: &'a HashMap<String, Arc<CommandGroup>, H>,
     name: &str,
@@ -423,6 +424,7 @@ fn fetch_single_command<'a, H: BuildHasher>(
 }
 
 /// Tries to extract a single command matching searched command name.
+#[cfg(feature = "cache")]
 fn fetch_all_eligible_commands_in_group<'a>(
     commands: &HashMap<&String, &InternalCommand>,
     command_names: &[&&String],
@@ -471,6 +473,7 @@ fn fetch_all_eligible_commands_in_group<'a>(
 }
 
 /// Fetch groups with their commands.
+#[cfg(feature = "cache")]
 fn create_command_group_commands_pair_from_groups<'a, H: BuildHasher>(
     groups: &'a HashMap<String, Arc<CommandGroup>, H>,
     group_names: &[&'a String],
@@ -498,6 +501,7 @@ fn create_command_group_commands_pair_from_groups<'a, H: BuildHasher>(
 }
 
 /// Fetches a single group with its commands.
+#[cfg(feature = "cache")]
 fn create_single_group<'a>(
     group: &CommandGroup,
     group_name: &'a str,
@@ -527,6 +531,7 @@ let commands = remove_aliases(&group.commands);
 /// Iterates over all commands and forges them into a `CustomisedHelpData`
 /// taking `HelpOptions` into consideration when deciding on whether a command
 /// shall be picked and in what textual format.
+#[cfg(feature = "cache")]
 pub fn create_customised_help_data<'a, H: BuildHasher>(
     groups: &'a HashMap<String, Arc<CommandGroup>, H>,
     args: &'a Args,
