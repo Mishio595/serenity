@@ -435,7 +435,7 @@ impl<'de> Deserialize<'de> for AuditLogs {
             #[serde(rename = "audit_log_entries")] Entries,
             #[serde(rename = "webhooks")] Webhooks,
             #[serde(rename = "users")] Users,
-            // TODO(field added by Discord, undocumented) #[serde(rename = "integrations")] Integrations,
+            #[serde(rename = "integrations")] Integrations,
         }
 
         struct EntriesVisitor;
@@ -451,6 +451,7 @@ impl<'de> Deserialize<'de> for AuditLogs {
                 let mut audit_log_entries = None;
                 let mut users = None;
                 let mut webhooks = None;
+                let mut integrations = None;
 
                 loop {
                     match map.next_key() {
@@ -474,6 +475,13 @@ impl<'de> Deserialize<'de> for AuditLogs {
                             }
 
                             users = Some(map.next_value::<Vec<User>>()?);
+                        },
+                        Ok(Some(Field::Integrations)) => {
+                            if integrations.is_some() {
+                                return Err(de::Error::duplicate_field("integrations"));
+                            }
+
+                            integrations = Some(map.next_value::<Vec<Integration>>()?);
                         },
                         Ok(None) => break, // No more keys
                         Err(e) => if e.description().contains("unknown field") {
