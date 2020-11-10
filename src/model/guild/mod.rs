@@ -1225,9 +1225,9 @@ impl Guild {
         // Create a base set of permissions, starting with `@everyone`s.
         let mut permissions = everyone.permissions;
 
-        let member = match self.members.get(&user_id) {
-            Some(member) => member,
-            None => return everyone.permissions,
+        let member = match self.member(&user_id) {
+            Ok(member) => member,
+            _ => return everyone.permissions,
         };
 
         for &role in &member.roles {
